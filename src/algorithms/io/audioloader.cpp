@@ -132,7 +132,50 @@ void AudioLoader::closeAudioFile() {
     _streams.clear();
 }
 
-AlgorithmStatus AudioLoader::process() {
+AlgorithmStatus AlgorithmStatus AudioLoader::process() {
+    if (!parameter("filename").isConfigured()) {
+        throw EssentiaException("AudioLoader: process() called without filename configured.");
+    }
+
+    // Função auxiliar para converter bytes em hex deve estar declarada
+    auto bytesToHex = [](uint8_t* input, int size) {
+        ostringstream result;
+        for (int i = 0; i < size; ++i) {
+            result << setw(2) << setfill('0') << hex << (int)input[i];
+        }
+        return result.str();
+    };
+
+    do {
+        int result = av_read_frame(_demuxCtx, &_packet);
+        if (result != 0) {
+            if (result != AVERROR_EOF) {
+                char errstring[1204];
+                av_strerror(result, errstring, sizeof(errstring));
+                E_WARNING(string("AudioLoader: Error reading frame: ") + errstring);
+            }
+            shouldStop(true);
+            flushPacket();
+            closeAudioFile();
+            if (_computeMD5) {
+                av_md5_final(_md5Encoded, _checksum);
+-                _md5.push(uint8_t_to_hex(_checksum, 16));
++                _md5.push(bytesToHex(_checksum, 16));
+            } else {
+                _md5.push(string());
+            }
+            return FINISHED;
+        }
+    } while (_packet.stream_index != _streamIdx);
+
+    if (_computeMD5) av_md5_update(_md5Encoded, _packet.data, _packet.size);
+    while (_packet.size > 0) {
+        if (!decodePacket()) break;
+        copyFFmpegOutput();
+    }
+    av_packet_unref(&_packet);
+    return OK;
+}() {
     if (!parameter("filename").isConfigured()) {
         throw EssentiaException("AudioLoader: process() called without filename configured.");
     }
