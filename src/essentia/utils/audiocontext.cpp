@@ -56,7 +56,7 @@ int AudioContext::create(const std::string& filename,
   _avStream = avformat_new_stream(_muxCtx, nullptr);
   if (!_avStream) throw EssentiaException("Could not allocate stream");
 
-  AVCodec* audioCodec = avcodec_find_encoder(av_output_format->audio_codec);
+  const AVCodec* audioCodec = avcodec_find_encoder(av_output_format->audio_codec);
   if (!audioCodec) throw EssentiaException("Codec for ", format, " files not found or not supported");
 
   _codecCtx = avcodec_alloc_context3(audioCodec);
